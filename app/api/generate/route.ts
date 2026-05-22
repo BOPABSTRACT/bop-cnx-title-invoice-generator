@@ -102,10 +102,6 @@ async function ocrPdfWithGoogleVision(buffer: Buffer): Promise<string> {
     );
   }
 
-  // Vision's DOCUMENT_TEXT_DETECTION feature accepts PDFs as base64 directly
-  // via the asyncBatchAnnotateFiles endpoint OR (for single PDFs <= 5MB and
-  // <= 5 pages) via the synchronous files:annotate endpoint. We use the
-  // synchronous endpoint because email PDFs are tiny.
   const base64Pdf = buffer.toString('base64');
 
   const requestBody = {
@@ -136,7 +132,6 @@ async function ocrPdfWithGoogleVision(buffer: Buffer): Promise<string> {
 
   const data = await res.json();
 
-  // Response: data.responses[0].responses[] = one per page
   const pageResponses = data?.responses?.[0]?.responses ?? [];
   const fullText = pageResponses
     .map((p: any) => p?.fullTextAnnotation?.text ?? '')
@@ -160,7 +155,6 @@ async function parseEmailPdf(buffer: Buffer): Promise<ParsedEmail> {
     text = '';
   }
 
-  // If pdf-parse returned nothing meaningful, fall back to Google Vision OCR
   if (!text || text.trim().length < 40) {
     text = await ocrPdfWithGoogleVision(buffer);
   }
@@ -717,17 +711,23 @@ async function buildInvoicePdf(
     startY: brokerTableStartY,
     head: brokerHead,
     body: brokerBody,
-    styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
-    headStyles: { fillColor: [10, 31, 68], textColor: 255, fontSize: 8, halign: 'center' },
+    styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
+    headStyles: {
+      fillColor: [10, 31, 68],
+      textColor: 255,
+      fontSize: 7,
+      halign: 'center',
+      valign: 'middle',
+    },
     columnStyles: {
-      0: { cellWidth: 90 },
-      1: { halign: 'right', cellWidth: 45 },
-      2: { halign: 'right', cellWidth: 60 },
-      3: { halign: 'right', cellWidth: 65 },
-      4: { halign: 'right', cellWidth: 80 },
-      5: { halign: 'right', cellWidth: 50 },
-      6: { halign: 'right', cellWidth: 70 },
-      7: { halign: 'right', cellWidth: 75 },
+      0: { cellWidth: 78 },
+      1: { halign: 'right', cellWidth: 38 },
+      2: { halign: 'right', cellWidth: 55 },
+      3: { halign: 'right', cellWidth: 60 },
+      4: { halign: 'right', cellWidth: 65 },
+      5: { halign: 'right', cellWidth: 45 },
+      6: { halign: 'right', cellWidth: 60 },
+      7: { halign: 'right', cellWidth: 65 },
     },
     didParseCell: (data) => {
       if (data.section === 'body') {
@@ -740,6 +740,7 @@ async function buildInvoicePdf(
       }
     },
     margin: { left: margin, right: margin },
+    tableWidth: 'auto',
   });
 
   const finalY = (doc as any).lastAutoTable?.finalY ?? brokerTableStartY + 100;
@@ -839,17 +840,23 @@ async function buildInvoicePdf(
       head,
       body,
       styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-      headStyles: { fillColor: [10, 31, 68], textColor: 255, fontSize: 7, halign: 'center' },
+      headStyles: {
+        fillColor: [10, 31, 68],
+        textColor: 255,
+        fontSize: 7,
+        halign: 'center',
+        valign: 'middle',
+      },
       columnStyles: {
-        0: { cellWidth: 70 },
-        1: { cellWidth: 50 },
-        2: { cellWidth: 110 },
-        3: { cellWidth: 130 },
-        4: { cellWidth: 60 },
-        5: { halign: 'right', cellWidth: 38 },
-        6: { halign: 'right', cellWidth: 45 },
-        7: { halign: 'right', cellWidth: 45 },
-        8: { halign: 'right', cellWidth: 55 },
+        0: { cellWidth: 60 },
+        1: { cellWidth: 45 },
+        2: { cellWidth: 90 },
+        3: { cellWidth: 110 },
+        4: { cellWidth: 55 },
+        5: { halign: 'right', cellWidth: 35 },
+        6: { halign: 'right', cellWidth: 40 },
+        7: { halign: 'right', cellWidth: 40 },
+        8: { halign: 'right', cellWidth: 50 },
       },
       didParseCell: (data) => {
         if (data.section === 'body') {
@@ -863,6 +870,7 @@ async function buildInvoicePdf(
         }
       },
       margin: { left: margin, right: margin },
+      tableWidth: 'auto',
     });
   }
 
