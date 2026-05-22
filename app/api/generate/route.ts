@@ -90,19 +90,85 @@ function extractCnxPids(text: string): string[] {
 }
 
 // ===================================================================
+// Google Vision OCR fallback for image-only PDFs
+// ===================================================================
+
+async function ocrPdfWithGoogleVision(buffer: Buffer): Promise<string> {
+  const apiKey = process.env.GOOGLE_VISION_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      'PDF appears to be image-only and no Google Vision API key is configured. ' +
+        'Set GOOGLE_VISION_API_KEY in Vercel environment variables, or use Outlook File → Save As → PDF.'
+    );
+  }
+
+  // Vision's DOCUMENT_TEXT_DETECTION feature accepts PDFs as base64 directly
+  // via the asyncBatchAnnotateFiles endpoint OR (for single PDFs <= 5MB and
+  // <= 5 pages) via the synchronous files:annotate endpoint. We use the
+  // synchronous endpoint because email PDFs are tiny.
+  const base64Pdf = buffer.toString('base64');
+
+  const requestBody = {
+    requests: [
+      {
+        inputConfig: {
+          mimeType: 'application/pdf',
+          content: base64Pdf,
+        },
+        features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+      },
+    ],
+  };
+
+  const res = await fetch(
+    `https://vision.googleapis.com/v1/files:annotate?key=${apiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody),
+    }
+  );
+
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Google Vision API error (${res.status}): ${errText}`);
+  }
+
+  const data = await res.json();
+
+  // Response: data.responses[0].responses[] = one per page
+  const pageResponses = data?.responses?.[0]?.responses ?? [];
+  const fullText = pageResponses
+    .map((p: any) => p?.fullTextAnnotation?.text ?? '')
+    .filter(Boolean)
+    .join('\n');
+
+  return fullText;
+}
+
+// ===================================================================
 // Email PDF parsing — CNX upload-notification format
 // ===================================================================
 
 async function parseEmailPdf(buffer: Buffer): Promise<ParsedEmail> {
   const pdfParse = (await import('pdf-parse')).default;
-  const data = await pdfParse(buffer);
-  const text = data.text;
+  let text = '';
+  try {
+    const data = await pdfParse(buffer);
+    text = data.text;
+  } catch {
+    text = '';
+  }
+
+  // If pdf-parse returned nothing meaningful, fall back to Google Vision OCR
+  if (!text || text.trim().length < 40) {
+    text = await ocrPdfWithGoogleVision(buffer);
+  }
 
   if (!text || text.trim().length < 40) {
     throw new Error(
-      'Email PDF appears to be image-only (no extractable text). ' +
-        'In Outlook, open the email and use File → Save As → PDF — not Print to PDF, ' +
-        'which rasterizes the content.'
+      'Could not extract any text from the email PDF, even with OCR. ' +
+        'Please re-export the email from Outlook using File → Save As → PDF.'
     );
   }
 
