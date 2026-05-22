@@ -16,6 +16,9 @@
     "jspdf-autotable": "^3.8.2",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^1.1.1",
+    "pdfjs-dist": "4.0.379",
+    "tesseract.js": "^5.1.0",
+    "canvas": "^2.11.2",
     "xlsx": "^0.18.5",
     "jszip": "^3.10.1"
   },
